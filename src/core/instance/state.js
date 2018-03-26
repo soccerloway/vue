@@ -147,7 +147,7 @@ function initData (vm: Component) {
       proxy(vm, `_data`, key)
     }
   }
-  // observe data
+  // observe data -> 对data进行监视
   observe(data, true /* asRootData */)
 }
 

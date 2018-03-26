@@ -13,6 +13,7 @@ import { extend, mergeOptions, formatComponentName } from '../util/index'
 let uid = 0
 
 export function initMixin (Vue: Class<Component>) {
+  // new Vue初始化实例时主要执行的就是这个 _init方法
   Vue.prototype._init = function (options?: Object) {
     const vm: Component = this
     // a uid
@@ -35,6 +36,7 @@ export function initMixin (Vue: Class<Component>) {
       // internal component options needs special treatment.
       initInternalComponent(vm, options)
     } else {
+      // 合并constructor的options和用户options
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor),
         options || {},
@@ -48,15 +50,22 @@ export function initMixin (Vue: Class<Component>) {
       vm._renderProxy = vm
     }
     // expose real self
-    vm._self = vm
-    initLifecycle(vm)
-    initEvents(vm)
-    initRender(vm)
-    callHook(vm, 'beforeCreate')
+    vm._self = vm        // 缓存自身实例 _self
+    initLifecycle(vm)    // 初始化生命周期
+    initEvents(vm)       // 初始化事件系统(父子组件通信)
+    initRender(vm)       // 渲染DOM
+    callHook(vm, 'beforeCreate')  // 调用 beforeCreate hook
     initInjections(vm) // resolve injections before data/props
-    initState(vm)
+    initState(vm)        // 初始化状态(包括data、computed、methods、watch)
     initProvide(vm) // resolve provide after data/props
-    callHook(vm, 'created')
+    callHook(vm, 'created')       // 调用 created hook
+
+    /**
+     * ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+     * 从上面我们可以知道:
+     * 1. beforeCreate会在数据状态初始化之前执行
+     * 2. created会在数据状态初始化之后执行
+     */
 
     /* istanbul ignore if */
     if (process.env.NODE_ENV !== 'production' && config.performance && mark) {

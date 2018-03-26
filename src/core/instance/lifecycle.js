@@ -21,10 +21,12 @@ import {
 export let activeInstance: any = null
 export let isUpdatingChildComponent: boolean = false
 
+/* initLifecycle实际上只是设置了一些私有属性 */
 export function initLifecycle (vm: Component) {
   const options = vm.$options
 
   // locate first non-abstract parent
+  // 定位第一个 非抽象Vue实例 (transition/keep-alive就属于抽象组件)
   let parent = options.parent
   if (parent && !options.abstract) {
     while (parent.$options.abstract && parent.$parent) {
