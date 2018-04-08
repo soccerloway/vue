@@ -39,7 +39,7 @@ export class Observer {
   dep: Dep;
   vmCount: number; // number of vms that has this object as root $data
 
-  constructor (value: any) {
+  constructor (value: any) { // value为vm._data对象
     this.value = value
     this.dep = new Dep()
     this.vmCount = 0
@@ -63,7 +63,7 @@ export class Observer {
   walk (obj: Object) {
     const keys = Object.keys(obj)
     for (let i = 0; i < keys.length; i++) {
-      defineReactive(obj, keys[i])
+      defineReactive(obj, keys[i]) // convert a property into getter/setter
     }
   }
 
@@ -106,11 +106,14 @@ function copyAugment (target: Object, src: Object, keys: Array<string>) {
  * returns the new observer if successfully observed,
  * or the existing observer if the value already has one.
  */
+// 为value创建观察者实例 且 返回对应的观察者
 export function observe (value: any, asRootData: ?boolean): Observer | void {
+  // 对不是对象或者是VNode 的 value 放弃观察，优化性能
   if (!isObject(value) || value instanceof VNode) {
     return
   }
   let ob: Observer | void
+  // 参数value是vm._data对象
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__
   } else if (
@@ -131,6 +134,7 @@ export function observe (value: any, asRootData: ?boolean): Observer | void {
 /**
  * Define a reactive property on an Object.
  */
+// 数据响应式系统的核心函数
 export function defineReactive (
   obj: Object,
   key: string,
@@ -140,6 +144,7 @@ export function defineReactive (
 ) {
   const dep = new Dep()
 
+  // 获取property的属性描述符
   const property = Object.getOwnPropertyDescriptor(obj, key)
   if (property && property.configurable === false) {
     return
@@ -152,10 +157,16 @@ export function defineReactive (
   }
   const setter = property && property.set
 
+  /**
+   * observe -> Observer constructor -> defineReactive -> observe
+   * 这里递归调用observe对嵌套对象收集依赖
+   */
   let childOb = !shallow && observe(val)
+
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
+    // get方法调用dep.depend方法收集数据依赖
     get: function reactiveGetter () {
       const value = getter ? getter.call(obj) : val
       if (Dep.target) {
@@ -169,6 +180,7 @@ export function defineReactive (
       }
       return value
     },
+    // set方法调用dep.notify触发watcher.update更新数据
     set: function reactiveSetter (newVal) {
       const value = getter ? getter.call(obj) : val
       /* eslint-disable no-self-compare */

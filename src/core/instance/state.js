@@ -112,7 +112,7 @@ function initProps (vm: Component, propsOptions: Object) {
 function initData (vm: Component) {
   let data = vm.$options.data
   data = vm._data = typeof data === 'function'
-    ? getData(data, vm)
+    ? getData(data, vm)  // 执行$options中的data函数，返回data对象
     : data || {}
   if (!isPlainObject(data)) {
     data = {}
@@ -127,6 +127,8 @@ function initData (vm: Component) {
   const props = vm.$options.props
   const methods = vm.$options.methods
   let i = keys.length
+
+  // 在while循环中对data的key进行检测，检测是否有与(methods/props)有命名冲突的data命名
   while (i--) {
     const key = keys[i]
     if (process.env.NODE_ENV !== 'production') {
@@ -144,6 +146,11 @@ function initData (vm: Component) {
         vm
       )
     } else if (!isReserved(key)) {
+      /**
+       * 若data的key没有与methods/props冲突，且不是js保留字，则调用proxy代理key
+       * 实际上data中key的值是存在_data[key]中的，proxy方法用于通过修改vm[key]
+       * 的get方法，使我们能通过 vm[key] 获取到 vm._data[key] 中的值
+       */
       proxy(vm, `_data`, key)
     }
   }
