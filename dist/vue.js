@@ -872,7 +872,7 @@ function toggleObserving (value) {
  * object's property keys into getter/setters that
  * collect dependencies and dispatch updates.
  */
-var Observer = function Observer (value) {
+var Observer = function Observer (value) { // value为vm._data对象
   this.value = value;
   this.dep = new Dep();
   this.vmCount = 0;
@@ -896,7 +896,7 @@ var Observer = function Observer (value) {
 Observer.prototype.walk = function walk (obj) {
   var keys = Object.keys(obj);
   for (var i = 0; i < keys.length; i++) {
-    defineReactive(obj, keys[i]);
+    defineReactive(obj, keys[i]); // convert a property into getter/setter
   }
 };
 
@@ -938,11 +938,14 @@ function copyAugment (target, src, keys) {
  * returns the new observer if successfully observed,
  * or the existing observer if the value already has one.
  */
+// 为value创建观察者实例 且 返回对应的观察者
 function observe (value, asRootData) {
+  // 对不是对象或者是VNode 的 value 放弃观察，优化性能
   if (!isObject(value) || value instanceof VNode) {
     return
   }
   var ob;
+  // 参数value是vm._data对象
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
     ob = value.__ob__;
   } else if (
@@ -963,6 +966,7 @@ function observe (value, asRootData) {
 /**
  * Define a reactive property on an Object.
  */
+// 数据响应式系统的核心函数
 function defineReactive (
   obj,
   key,
@@ -972,6 +976,7 @@ function defineReactive (
 ) {
   var dep = new Dep();
 
+  // 获取property的属性描述符
   var property = Object.getOwnPropertyDescriptor(obj, key);
   if (property && property.configurable === false) {
     return
@@ -984,10 +989,16 @@ function defineReactive (
   }
   var setter = property && property.set;
 
+  /**
+   * observe -> Observer constructor -> defineReactive -> observe
+   * 这里递归调用observe对嵌套对象收集依赖
+   */
   var childOb = !shallow && observe(val);
+
   Object.defineProperty(obj, key, {
     enumerable: true,
     configurable: true,
+    // get方法调用dep.depend方法收集数据依赖
     get: function reactiveGetter () {
       var value = getter ? getter.call(obj) : val;
       if (Dep.target) {
@@ -1001,6 +1012,7 @@ function defineReactive (
       }
       return value
     },
+    // set方法调用dep.notify触发watcher.update更新数据
     set: function reactiveSetter (newVal) {
       var value = getter ? getter.call(obj) : val;
       /* eslint-disable no-self-compare */
@@ -1929,7 +1941,7 @@ var initProxy;
   var hasHandler = {
     has: function has (target, key) {
       var has = key in target;
-      var isAllowed = allowedGlobals(key) || key.charAt(0) === '_';
+      var isAllowed = allowedGlobals(key) || (typeof key === 'string' && key.charAt(0) === '_');
       if (!has && !isAllowed) {
         warnNonPresent(target, key);
       }
@@ -2616,10 +2628,12 @@ function resolveScopedSlots (
 var activeInstance = null;
 var isUpdatingChildComponent = false;
 
+/* initLifecycle实际上只是设置了一些私有属性 */
 function initLifecycle (vm) {
   var options = vm.$options;
 
   // locate first non-abstract parent
+  // 定位第一个 非抽象Vue实例 (transition/keep-alive就属于抽象组件)
   var parent = options.parent;
   if (parent && !options.abstract) {
     while (parent.$options.abstract && parent.$parent) {
@@ -3367,7 +3381,7 @@ function initProps (vm, propsOptions) {
 function initData (vm) {
   var data = vm.$options.data;
   data = vm._data = typeof data === 'function'
-    ? getData(data, vm)
+    ? getData(data, vm)  // 执行$options中的data函数，返回data对象
     : data || {};
   if (!isPlainObject(data)) {
     data = {};
@@ -3382,6 +3396,8 @@ function initData (vm) {
   var props = vm.$options.props;
   var methods = vm.$options.methods;
   var i = keys.length;
+
+  // 在while循环中对data的key进行检测，检测是否有与(methods/props)有命名冲突的data命名
   while (i--) {
     var key = keys[i];
     {
@@ -3399,10 +3415,15 @@ function initData (vm) {
         vm
       );
     } else if (!isReserved(key)) {
+      /**
+       * 若data的key没有与methods/props冲突，且不是js保留字，则调用proxy代理key
+       * 实际上data中key的值是存在_data[key]中的，proxy方法用于通过修改vm[key]
+       * 的get方法，使我们能通过 vm[key] 获取到 vm._data[key] 中的值
+       */
       proxy(vm, "_data", key);
     }
   }
-  // observe data
+  // observe data -> 对data进行监视
   observe(data, true /* asRootData */);
 }
 
@@ -4573,6 +4594,7 @@ function renderMixin (Vue) {
 var uid$3 = 0;
 
 function initMixin (Vue) {
+  // new Vue初始化实例时主要执行的就是这个 _init方法
   Vue.prototype._init = function (options) {
     var vm = this;
     // a uid
@@ -4595,6 +4617,7 @@ function initMixin (Vue) {
       // internal component options needs special treatment.
       initInternalComponent(vm, options);
     } else {
+      // 合并constructor的options和用户options
       vm.$options = mergeOptions(
         resolveConstructorOptions(vm.constructor),
         options || {},
@@ -4606,15 +4629,22 @@ function initMixin (Vue) {
       initProxy(vm);
     }
     // expose real self
-    vm._self = vm;
-    initLifecycle(vm);
-    initEvents(vm);
-    initRender(vm);
-    callHook(vm, 'beforeCreate');
+    vm._self = vm;        // 缓存自身实例 _self
+    initLifecycle(vm);    // 初始化生命周期
+    initEvents(vm);       // 初始化事件系统(父子组件通信)
+    initRender(vm);       // 渲染DOM
+    callHook(vm, 'beforeCreate');  // 调用 beforeCreate hook
     initInjections(vm); // resolve injections before data/props
-    initState(vm);
+    initState(vm);        // 初始化状态(包括data、computed、methods、watch)
     initProvide(vm); // resolve provide after data/props
-    callHook(vm, 'created');
+    callHook(vm, 'created');       // 调用 created hook
+
+    /**
+     * ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+     * 从上面我们可以知道:
+     * 1. beforeCreate会在数据状态初始化之前执行
+     * 2. created会在数据状态初始化之后执行
+     */
 
     /* istanbul ignore if */
     if ("development" !== 'production' && config.performance && mark) {
@@ -4707,16 +4737,19 @@ function dedupe (latest, extended, sealed) {
   }
 }
 
+// Vue对象的构造函数
 function Vue (options) {
   if ("development" !== 'production' &&
-    !(this instanceof Vue)
+    !(this instanceof Vue) // 这里检测是否为Vue实例
   ) {
     warn('Vue is a constructor and should be called with the `new` keyword');
   }
-  this._init(options);
+  // 根据options配置初始化Vue实例
+  this._init(options); // _init方法在下面的initMixin中有定义
 }
 
-initMixin(Vue);
+/* 扩展Vue的原型 */
+initMixin(Vue); // 扩展Vue初始化
 stateMixin(Vue);
 eventsMixin(Vue);
 lifecycleMixin(Vue);
@@ -4761,7 +4794,7 @@ function initExtend (Vue) {
    * cid. This enables us to create wrapped "child
    * constructors" for prototypal inheritance and cache them.
    */
-  Vue.cid = 0;
+  Vue.cid = 0;  // cid应该是constructorId
   var cid = 1;
 
   /**
@@ -5013,8 +5046,11 @@ var builtInComponents = {
 
 /*  */
 
+// 这个是 Vue构造函数的配置项文件
+// 函数参数为 Vue构造函数
 function initGlobalAPI (Vue) {
   // config
+  // 初始化 Vue构造函数的配置信息，覆写config的getter和setter
   var configDef = {};
   configDef.get = function () { return config; };
   {
@@ -5029,6 +5065,7 @@ function initGlobalAPI (Vue) {
   // exposed util methods.
   // NOTE: these are not considered part of the public API - avoid relying on
   // them unless you are aware of the risk.
+  // 暴露工具方法，这些工具方法不属于公共API，尽量避免使用它们，除非你很清除其中的风险
   Vue.util = {
     warn: warn,
     extend: extend,
@@ -5036,11 +5073,17 @@ function initGlobalAPI (Vue) {
     defineReactive: defineReactive
   };
 
+  // set 设置对象的属性。如果对象是响应式的，确保属性被创建后也是响应式的，同时触发视图更新。这个方法主要用于避开 Vue 不能检测属性被添加的限制。
   Vue.set = set;
+  // delete 删除对象的属性。如果对象是响应式的，确保删除能触发更新视图。这个方法主要用于避开 Vue 不能检测到属性被删除的限制，但是你应该很少会使用它。
   Vue.delete = del;
+  // nextTick 在下次 DOM 更新循环结束之后执行延迟回调。在修改数据之后立即使用这个方法，获取更新后的 DOM。
   Vue.nextTick = nextTick;
 
   Vue.options = Object.create(null);
+
+  // 初始化构造函数options上的资源对象为null
+  // ASSET_TYPES: ['component', 'directive', 'filter']
   ASSET_TYPES.forEach(function (type) {
     Vue.options[type + 's'] = Object.create(null);
   });
@@ -5049,16 +5092,35 @@ function initGlobalAPI (Vue) {
   // components with in Weex's multi-instance scenarios.
   Vue.options._base = Vue;
 
+  // 向Vue构造函数中注册内置组件
+  // 内置组件为: keep-alive 抽象组件, 主要用于保留组件状态或避免重新渲染
   extend(Vue.options.components, builtInComponents);
 
+  // 注册Vue.use方法，用于使用Vue插件
   initUse(Vue);
+
+  // 注册Vue.mixin 全局混入方法
   initMixin$1(Vue);
+
+  // 注册Vue.extend 使用基础Vue构造器，创建一个“子类”Vue构造函数
   initExtend(Vue);
+
+  // 注册Vue.component Vue.directive Vue.filter方法，注册[ASSETS]使用
   initAssetRegisters(Vue);
 }
 
+/**
+ * 这个文件就是整个Vue构造函数的入口文件
+ * import导入核心Vue构造函数
+ * 扩展构造函数的全局API
+ * 定义运行环境参数
+ */
+
+// Vue构造函数的核心实现文件
+// 为Vue构造函数扩展全局API, 如: vue.extend, vue.filter等
 initGlobalAPI(Vue);
 
+// 覆写$isServer的getter: 判断是否是SSR
 Object.defineProperty(Vue.prototype, '$isServer', {
   get: isServerRendering
 });

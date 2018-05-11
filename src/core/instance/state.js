@@ -45,6 +45,7 @@ export function proxy (target: Object, sourceKey: string, key: string) {
   Object.defineProperty(target, key, sharedPropertyDefinition)
 }
 
+// 根据options里的配置初始化各states
 export function initState (vm: Component) {
   vm._watchers = []
   const opts = vm.$options
