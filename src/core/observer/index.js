@@ -142,6 +142,7 @@ export function defineReactive (
   customSetter?: ?Function,
   shallow?: boolean
 ) {
+  // 这里通过闭包，为每个属性都创建了Dep的实例dep，作为相应属性的依赖管理对象
   const dep = new Dep()
 
   // 获取property的属性描述符

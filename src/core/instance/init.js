@@ -74,6 +74,7 @@ export function initMixin (Vue: Class<Component>) {
       measure(`vue ${vm._name} init`, startTag, endTag)
     }
 
+    // $mount方法就是模板compile的入口
     if (vm.$options.el) {
       vm.$mount(vm.$options.el)
     }

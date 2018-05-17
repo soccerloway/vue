@@ -12,11 +12,11 @@ export const createCompiler = createCompilerCreator(function baseCompile (
   template: string,
   options: CompilerOptions
 ): CompiledResult {
-  const ast = parse(template.trim(), options)
+  const ast = parse(template.trim(), options) // parse过程 将template转为AST
   if (options.optimize !== false) {
-    optimize(ast, options)
+    optimize(ast, options) // optimize 标记静态节点 优化性能, diff VNode时将忽略静态节点比对
   }
-  const code = generate(ast, options)
+  const code = generate(ast, options) // 根据AST结构拼接生成 render function 的字符串
   return {
     ast,
     render: code.render,
