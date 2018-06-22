@@ -2,7 +2,7 @@
 
 import config from '../config'
 import Watcher from '../observer/watcher'
-import Dep, { pushTarget, popTarget } from '../observer/dep'
+import { pushTarget, popTarget } from '../observer/dep'
 import { isUpdatingChildComponent } from './lifecycle'
 
 import {
@@ -172,7 +172,7 @@ export function getData (data: Function, vm: Component): any {
   }
 }
 
-const computedWatcherOptions = { lazy: true }
+const computedWatcherOptions = { computed: true }
 
 function initComputed (vm: Component, computed: Object) {
   // $flow-disable-line
@@ -252,13 +252,8 @@ function createComputedGetter (key) {
   return function computedGetter () {
     const watcher = this._computedWatchers && this._computedWatchers[key]
     if (watcher) {
-      if (watcher.dirty) {
-        watcher.evaluate()
-      }
-      if (Dep.target) {
-        watcher.depend()
-      }
-      return watcher.value
+      watcher.depend()
+      return watcher.evaluate()
     }
   }
 }

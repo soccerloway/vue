@@ -153,10 +153,10 @@ export function defineReactive (
 
   // cater for pre-defined getter/setters
   const getter = property && property.get
-  if (!getter && arguments.length === 2) {
+  const setter = property && property.set
+  if ((!getter || setter) && arguments.length === 2) {
     val = obj[key]
   }
-  const setter = property && property.set
 
   /**
    * observe -> Observer constructor -> defineReactive -> observe
