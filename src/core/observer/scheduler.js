@@ -54,10 +54,13 @@ function flushSchedulerQueue () {
   for (index = 0; index < queue.length; index++) {
     watcher = queue[index]
     if (watcher.before) {
+      // watcher的before钩子函数在这里调用
+      // 数据变化之后，触发更新之前
       watcher.before()
     }
     id = watcher.id
     has[id] = null
+    // 从这里看出 真正能够触发更新DOM的是watcher.run方法
     watcher.run()
     // in dev build, check and stop circular updates.
     if (process.env.NODE_ENV !== 'production' && has[id] != null) {
@@ -145,6 +148,8 @@ export function queueWatcher (watcher: Watcher) {
     // queue the flush
     if (!waiting) {
       waiting = true
+      // 用nextTick将flushSchedulerQueue方法放入microtask队列
+      // 使用异步任务队列 使一次重渲染就更新了多次的数据变化
       nextTick(flushSchedulerQueue)
     }
   }

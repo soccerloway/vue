@@ -682,20 +682,25 @@ var Dep = function Dep () {
   this.subs = [];
 };
 
+// 增加订阅者
 Dep.prototype.addSub = function addSub (sub) {
   this.subs.push(sub);
 };
 
+// 删除订阅者
 Dep.prototype.removeSub = function removeSub (sub) {
   remove(this.subs, sub);
 };
 
+// 属性getter中调用，收集当前属性的依赖
 Dep.prototype.depend = function depend () {
   if (Dep.target) {
     Dep.target.addDep(this);
   }
 };
 
+// 属性setter中调用，遍历订阅者list中的watcher，调用watcher.update方法
+// 通知依赖该属性的表达式或计算属性更新
 Dep.prototype.notify = function notify () {
   // stabilize the subscriber list first
   var subs = this.subs.slice();
@@ -948,6 +953,8 @@ function observe (value, asRootData) {
   var ob;
   // 参数value是vm._data对象
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+    // 当value上存在__ob__且__ob__是Observer实例 直接复制value.__ob__
+    // 这样可以避免对同一数据 进行重复观察 优化性能
     ob = value.__ob__;
   } else if (
     shouldObserve &&
@@ -975,6 +982,7 @@ function defineReactive (
   customSetter,
   shallow
 ) {
+  // 这里通过闭包，为每个属性都创建了Dep的实例dep，作为相应属性的依赖管理对象
   var dep = new Dep();
 
   // 获取property的属性描述符
@@ -984,6 +992,8 @@ function defineReactive (
   }
 
   // cater for pre-defined getter/setters
+  // 对象属性可能已经是存取描述符了，所以如果存在getter和setter就先保存起来
+  // 下面的defineProperty重新定义getter和setter时使用, 避免已有的get/set被覆盖
   var getter = property && property.get;
   var setter = property && property.set;
   if ((!getter || setter) && arguments.length === 2) {
@@ -1466,6 +1476,7 @@ function mergeOptions (
   child,
   vm
 ) {
+  // 检测组件是否合法 1.命名只有字母和中划线 2.不能是html保留字
   {
     checkComponents(child);
   }
@@ -1474,9 +1485,11 @@ function mergeOptions (
     child = child.options;
   }
 
+  // 规范化 props, injects, directives，即处理多种注册方式 语法糖
   normalizeProps(child, vm);
   normalizeInject(child, vm);
   normalizeDirectives(child);
+
   var extendsFrom = child.extends;
   if (extendsFrom) {
     parent = mergeOptions(parent, extendsFrom, vm);
@@ -1791,6 +1804,13 @@ var useMacroTask = false;
 // in IE. The only polyfill that consistently queues the callback after all DOM
 // events triggered in the same loop is by using MessageChannel.
 /* istanbul ignore if */
+/**
+ * 三种方式将回调函数注册为(macro)task，也有优先级之分
+ * setImmediate 简洁且不做超时检测，但只兼容ie，性能最优
+ * MessageChannel也不做超时检测，次优
+ * setTimeout要做超时检测，兼容性好，保底选择
+ */
+// 这里只是在定义函数，执行后才会注册
 if (typeof setImmediate !== 'undefined' && isNative(setImmediate)) {
   macroTimerFunc = function () {
     setImmediate(flushCallbacks);
@@ -1815,6 +1835,8 @@ if (typeof setImmediate !== 'undefined' && isNative(setImmediate)) {
 
 // Determine microtask defer implementation.
 /* istanbul ignore next, $flow-disable-line */
+// 将回调函数注册为microtask 使用Promise，若不支持Promise，降级使用macrotask
+// 这里只是在定义函数，执行后才会注册
 if (typeof Promise !== 'undefined' && isNative(Promise)) {
   var p = Promise.resolve();
   microTimerFunc = function () {
@@ -1824,7 +1846,7 @@ if (typeof Promise !== 'undefined' && isNative(Promise)) {
     // microtask queue but the queue isn't being flushed, until the browser
     // needs to do some other work, e.g. handle a timer. Therefore we can
     // "force" the microtask queue to be flushed by adding an empty timer.
-    if (isIOS) { setTimeout(noop); }
+    if (isIOS) { setTimeout(noop); } // 兼容性 强制更新microtask队列
   };
 } else {
   // fallback to macro
@@ -1844,6 +1866,7 @@ function withMacroTask (fn) {
   })
 }
 
+// 完成回调函数到event loop task的注册
 function nextTick (cb, ctx) {
   var _resolve;
   callbacks.push(function () {
@@ -2741,6 +2764,7 @@ function lifecycleMixin (Vue) {
   };
 }
 
+// 挂载组件
 function mountComponent (
   vm,
   el,
@@ -2769,6 +2793,7 @@ function mountComponent (
   }
   callHook(vm, 'beforeMount');
 
+  // 定义 初始化 updateComponent 方法
   var updateComponent;
   /* istanbul ignore if */
   if ("development" !== 'production' && config.performance && mark) {
@@ -2779,12 +2804,12 @@ function mountComponent (
       var endTag = "vue-perf-end:" + id;
 
       mark(startTag);
-      var vnode = vm._render();
+      var vnode = vm._render();  // _render函数,即vm.$options.render 执行后得到vnode
       mark(endTag);
       measure(("vue " + name + " render"), startTag, endTag);
 
       mark(startTag);
-      vm._update(vnode, hydrating);
+      vm._update(vnode, hydrating); // _update把虚拟DOM渲染成真正的DOM
       mark(endTag);
       measure(("vue " + name + " patch"), startTag, endTag);
     };
@@ -2924,7 +2949,7 @@ function deactivateChildComponent (vm, direct) {
 
 function callHook (vm, hook) {
   // #7573 disable dep collection when invoking lifecycle hooks
-  pushTarget();
+  pushTarget(); // pushTarget 防止在生命周期钩子中使用 props 导致冗余的依赖收集
   var handlers = vm.$options[hook];
   if (handlers) {
     for (var i = 0, j = handlers.length; i < j; i++) {
@@ -2935,6 +2960,9 @@ function callHook (vm, hook) {
       }
     }
   }
+
+  // callHook结束后 通过vm.$emit发射名为 hook:${hook} 的事件
+  // 说明vue还可以这样玩: <child @hook:created="handleChildCreated" />
   if (vm._hasHookEvent) {
     vm.$emit('hook:' + hook);
   }
@@ -2988,10 +3016,13 @@ function flushSchedulerQueue () {
   for (index = 0; index < queue.length; index++) {
     watcher = queue[index];
     if (watcher.before) {
+      // watcher的before钩子函数在这里调用
+      // 数据变化之后，触发更新之前
       watcher.before();
     }
     id = watcher.id;
     has[id] = null;
+    // 从这里看出 真正能够触发更新DOM的是watcher.run方法
     watcher.run();
     // in dev build, check and stop circular updates.
     if ("development" !== 'production' && has[id] != null) {
@@ -3079,6 +3110,8 @@ function queueWatcher (watcher) {
     // queue the flush
     if (!waiting) {
       waiting = true;
+      // 用nextTick将flushSchedulerQueue方法放入microtask队列
+      // 使用异步任务队列 使一次重渲染就更新了多次的数据变化
       nextTick(flushSchedulerQueue);
     }
   }
@@ -3094,11 +3127,11 @@ var uid$1 = 0;
  * This is used for both the $watch() api and directives.
  */
 var Watcher = function Watcher (
-  vm,
-  expOrFn,
-  cb,
-  options,
-  isRenderWatcher
+  vm,// vue实例/组件实例
+  expOrFn,// 被观察的目标
+  cb,// 变化回调
+  options,//
+  isRenderWatcher// 是否为渲染函数观察者
 ) {
   this.vm = vm;
   if (isRenderWatcher) {
@@ -3119,10 +3152,14 @@ var Watcher = function Watcher (
   this.id = ++uid$1; // uid for batching
   this.active = true;
   this.dirty = this.computed; // for computed watchers
+
+  //----- 实现避免收集重复依赖，且移除无用依赖的功能相关
   this.deps = [];
   this.newDeps = [];
   this.depIds = new _Set();
   this.newDepIds = new _Set();
+  // -----------------------------------------
+
   this.expression = expOrFn.toString();
   // parse expression for getter
   if (typeof expOrFn === 'function') {
@@ -3143,15 +3180,17 @@ var Watcher = function Watcher (
     this.value = undefined;
     this.dep = new Dep();
   } else {
-    this.value = this.get();
+    this.value = this.get();// 创建watcher时会调用 watcher.get 方法
   }
 };
 
 /**
  * Evaluate the getter, and re-collect dependencies.
  */
+// 第一：能够触发访问器属性的 get 拦截器函数 触发依赖收集
+// 第二：能够获得被观察目标的值
 Watcher.prototype.get = function get () {
-  pushTarget(this);
+  pushTarget(this);// 此方法会把当前watcher赋值给Dep.target 作为当前的依赖收集目标
   var value;
   var vm = this.vm;
   try {
@@ -3165,6 +3204,8 @@ Watcher.prototype.get = function get () {
   } finally {
     // "touch" every property so they are all tracked as
     // dependencies for deep watching
+    // 深度检测基于traverse函数实现
+    // traverse的作用就是 递归触发数组子项或对象子属性的求值，以完成子属性的依赖收集
     if (this.deep) {
       traverse(value);
     }
@@ -3179,9 +3220,11 @@ Watcher.prototype.get = function get () {
  */
 Watcher.prototype.addDep = function addDep (dep) {
   var id = dep.id;
+  // 避免在一次求值中依赖重复收集 如template: <div>{{name}} {{name}}</div>
   if (!this.newDepIds.has(id)) {
     this.newDepIds.add(id);
     this.newDeps.push(dep);
+    // 避免在多次求值中依赖重复收集，即watcher值发生变化时的求值
     if (!this.depIds.has(id)) {
       dep.addSub(this);
     }
@@ -3191,12 +3234,16 @@ Watcher.prototype.addDep = function addDep (dep) {
 /**
  * Clean up for dependency collection.
  */
+// 由清空newDepIds和newDeps函数可分析出：
+//  1. depIds 和 deps 始终储存上一次求值收集的依赖
+//  2. newDepIds 和 newDeps 总是存放当次求值收集的依赖
 Watcher.prototype.cleanupDeps = function cleanupDeps () {
     var this$1 = this;
 
   var i = this.deps.length;
   while (i--) {
     var dep = this$1.deps[i];
+    // 移除废弃的依赖
     if (!this$1.newDepIds.has(dep.id)) {
       dep.removeSub(this$1);
     }
@@ -3254,7 +3301,11 @@ Watcher.prototype.run = function run () {
   }
 };
 
+// setter触发变化更新的核心方法
 Watcher.prototype.getAndInvoke = function getAndInvoke (cb) {
+  // 当watcher为渲染函数观察者时，只会执行this.get()
+  // this.get执行this.getter, 此时this.getter即是updateComponent方法
+  // 达到重新计算虚拟DOM，更新真实DOM的作用
   var value = this.get();
   if (
     value !== this.value ||
@@ -3341,8 +3392,9 @@ function proxy (target, sourceKey, key) {
   Object.defineProperty(target, key, sharedPropertyDefinition);
 }
 
+// 根据options里的配置初始化各states
 function initState (vm) {
-  vm._watchers = [];
+  vm._watchers = []; // 存储该实例的所有watcher对象
   var opts = vm.$options;
   if (opts.props) { initProps(vm, opts.props); }
   if (opts.methods) { initMethods(vm, opts.methods); }
@@ -3352,6 +3404,9 @@ function initState (vm) {
     observe(vm._data = {}, true /* asRootData */);
   }
   if (opts.computed) { initComputed(vm, opts.computed); }
+
+  // 这里判断是否存在watch 还判断了opts.watch是否等于nativeWatch
+  // 因为 在firefox中存在Object.prototype.watch方法 需要排除
   if (opts.watch && opts.watch !== nativeWatch) {
     initWatch(vm, opts.watch);
   }
@@ -3441,9 +3496,9 @@ function initData (vm) {
         "Use prop default value instead.",
         vm
       );
-    } else if (!isReserved(key)) {
+    } else if (!isReserved(key)) { // isReserved通过判断是否以$ _开头来确定是否是vue保留键
       /**
-       * 若data的key没有与methods/props冲突，且不是js保留字，则调用proxy代理key
+       * 若data的key没有与methods/props冲突，且不是vue保留字，则调用proxy代理key
        * 实际上data中key的值是存在_data[key]中的，proxy方法用于通过修改vm[key]
        * 的get方法，使我们能通过 vm[key] 获取到 vm._data[key] 中的值
        */
@@ -3456,7 +3511,7 @@ function initData (vm) {
 
 function getData (data, vm) {
   // #7573 disable dep collection when invoking data getters
-  pushTarget();
+  pushTarget(); // 防止使用 props 数据初始化 data 数据时收集冗余依赖
   try {
     return data.call(vm, vm)
   } catch (e) {
@@ -4625,6 +4680,7 @@ function initMixin (Vue) {
     // a uid
     vm._uid = uid$3++;
 
+    // 性能追踪的实现 标记组件的init开始标记
     var startTag, endTag;
     /* istanbul ignore if */
     if ("development" !== 'production' && config.performance && mark) {
@@ -4634,6 +4690,7 @@ function initMixin (Vue) {
     }
 
     // a flag to avoid this being observed
+    // 标记这个实例对象是一个vue实例
     vm._isVue = true;
     // merge options
     if (options && options._isComponent) {
@@ -4672,12 +4729,14 @@ function initMixin (Vue) {
      */
 
     /* istanbul ignore if */
+    // 性能追踪的实现 标记组件的init结束标记 measure函数计算性能
     if ("development" !== 'production' && config.performance && mark) {
       vm._name = formatComponentName(vm, false);
       mark(endTag);
       measure(("vue " + (vm._name) + " init"), startTag, endTag);
     }
 
+    // $mount方法就是模板compile的入口
     if (vm.$options.el) {
       vm.$mount(vm.$options.el);
     }
@@ -4760,6 +4819,9 @@ function dedupe (latest, extended, sealed) {
   }
 }
 
+/**
+ * 此文件在运行时构建时执行完成，例如：npm run dev时执行完毕
+ */
 // Vue对象的构造函数
 function Vue (options) {
   if ("development" !== 'production' &&
@@ -10911,11 +10973,11 @@ var createCompiler = createCompilerCreator(function baseCompile (
   template,
   options
 ) {
-  var ast = parse(template.trim(), options);
+  var ast = parse(template.trim(), options); // parse过程 将template转为AST
   if (options.optimize !== false) {
-    optimize(ast, options);
+    optimize(ast, options); // optimize 标记静态节点 优化性能, diff VNode时将忽略静态节点比对
   }
-  var code = generate(ast, options);
+  var code = generate(ast, options); // 根据AST结构拼接生成 render function 的字符串
   return {
     ast: ast,
     render: code.render,
@@ -10992,12 +11054,17 @@ Vue.prototype.$mount = function (
     } else if (el) {
       template = getOuterHTML(el);
     }
+    /**
+     * 经过上面if...eles处理后，template的值为生成renderFn需要的模板字符串
+     */
+
     if (template) {
       /* istanbul ignore if */
       if ("development" !== 'production' && config.performance && mark) {
         mark('compile');
       }
 
+      // compileToFunctions函数即是将 模板字符串 编译为render函数的关键函数
       var ref = compileToFunctions(template, {
         shouldDecodeNewlines: shouldDecodeNewlines,
         shouldDecodeNewlinesForHref: shouldDecodeNewlinesForHref,

@@ -27,27 +27,27 @@ export default class Watcher {
   expression: string;
   cb: Function;
   id: number;
-  deep: boolean;
-  user: boolean;
-  computed: boolean;
-  sync: boolean;
-  dirty: boolean;
-  active: boolean;
+  deep: boolean;  // 是否深度观测
+  user: boolean;  // 标记是否为开发者定义的watcher
+  computed: boolean; // 标记是否计算属性的watcher
+  sync: boolean; // 用来告诉观察者当数据变化时是否同步求值并执行回调
+  dirty: boolean;  // 计算属性观察者才会为 true, 计算属性惰性计算
+  active: boolean; // 标识着该观察者实例对象是否是激活状态
   dep: Dep;
   deps: Array<Dep>;
   newDeps: Array<Dep>;
   depIds: SimpleSet;
   newDepIds: SimpleSet;
-  before: ?Function;
+  before: ?Function;  // Watcher 实例的钩子，当数据变化之后触发更新之前调用
   getter: Function;
   value: any;
 
   constructor (
-    vm: Component,
-    expOrFn: string | Function,
-    cb: Function,
-    options?: ?Object,
-    isRenderWatcher?: boolean
+    vm: Component,  // vue实例/组件实例
+    expOrFn: string | Function,  // 被观察的目标
+    cb: Function,  // 变化回调
+    options?: ?Object,  //
+    isRenderWatcher?: boolean  // 是否为渲染函数观察者
   ) {
     this.vm = vm
     if (isRenderWatcher) {
@@ -68,10 +68,14 @@ export default class Watcher {
     this.id = ++uid // uid for batching
     this.active = true
     this.dirty = this.computed // for computed watchers
+
+    //----- 实现避免收集重复依赖，且移除无用依赖的功能相关
     this.deps = []
     this.newDeps = []
     this.depIds = new Set()
     this.newDepIds = new Set()
+    // -----------------------------------------
+
     this.expression = process.env.NODE_ENV !== 'production'
       ? expOrFn.toString()
       : ''
@@ -94,15 +98,17 @@ export default class Watcher {
       this.value = undefined
       this.dep = new Dep()
     } else {
-      this.value = this.get()
+      this.value = this.get()  // 创建watcher时会调用 watcher.get 方法
     }
   }
 
   /**
    * Evaluate the getter, and re-collect dependencies.
    */
+  // 第一：能够触发访问器属性的 get 拦截器函数 触发依赖收集
+  // 第二：能够获得被观察目标的值
   get () {
-    pushTarget(this)
+    pushTarget(this)  // 此方法会把当前watcher赋值给Dep.target 作为当前的依赖收集目标
     let value
     const vm = this.vm
     try {
@@ -116,6 +122,8 @@ export default class Watcher {
     } finally {
       // "touch" every property so they are all tracked as
       // dependencies for deep watching
+      // 深度检测基于traverse函数实现
+      // traverse的作用就是 递归触发数组子项或对象子属性的求值，以完成子属性的依赖收集
       if (this.deep) {
         traverse(value)
       }
@@ -130,9 +138,11 @@ export default class Watcher {
    */
   addDep (dep: Dep) {
     const id = dep.id
+    // 避免在一次求值中依赖重复收集 如template: <div>{{name}} {{name}}</div>
     if (!this.newDepIds.has(id)) {
       this.newDepIds.add(id)
       this.newDeps.push(dep)
+      // 避免在多次求值中依赖重复收集，即watcher值发生变化时的求值
       if (!this.depIds.has(id)) {
         dep.addSub(this)
       }
@@ -142,10 +152,14 @@ export default class Watcher {
   /**
    * Clean up for dependency collection.
    */
+  // 由清空newDepIds和newDeps函数可分析出：
+  //    1. depIds 和 deps 始终储存上一次求值收集的依赖
+  //    2. newDepIds 和 newDeps 总是存放当次求值收集的依赖
   cleanupDeps () {
     let i = this.deps.length
     while (i--) {
       const dep = this.deps[i]
+      // 移除废弃的依赖
       if (!this.newDepIds.has(dep.id)) {
         dep.removeSub(this)
       }
@@ -201,7 +215,11 @@ export default class Watcher {
     }
   }
 
+  // setter触发变化更新的核心方法
   getAndInvoke (cb: Function) {
+    // 当watcher为渲染函数观察者时，只会执行this.get()
+    // this.get执行this.getter, 此时this.getter即是updateComponent方法
+    // 达到重新计算虚拟DOM，更新真实DOM的作用
     const value = this.get()
     if (
       value !== this.value ||

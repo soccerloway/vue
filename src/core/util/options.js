@@ -367,6 +367,7 @@ export function mergeOptions (
   child: Object,
   vm?: Component
 ): Object {
+  // 检测组件是否合法 1.命名只有字母和中划线 2.不能是html保留字
   if (process.env.NODE_ENV !== 'production') {
     checkComponents(child)
   }
@@ -375,9 +376,11 @@ export function mergeOptions (
     child = child.options
   }
 
+  // 规范化 props, injects, directives，即处理多种注册方式 语法糖
   normalizeProps(child, vm)
   normalizeInject(child, vm)
   normalizeDirectives(child)
+
   const extendsFrom = child.extends
   if (extendsFrom) {
     parent = mergeOptions(parent, extendsFrom, vm)

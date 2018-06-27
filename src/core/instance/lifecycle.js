@@ -133,6 +133,7 @@ export function lifecycleMixin (Vue: Class<Component>) {
   }
 }
 
+// 挂载组件
 export function mountComponent (
   vm: Component,
   el: ?Element,
@@ -161,6 +162,7 @@ export function mountComponent (
   }
   callHook(vm, 'beforeMount')
 
+  // 定义 初始化 updateComponent 方法
   let updateComponent
   /* istanbul ignore if */
   if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
@@ -171,12 +173,12 @@ export function mountComponent (
       const endTag = `vue-perf-end:${id}`
 
       mark(startTag)
-      const vnode = vm._render()
+      const vnode = vm._render()  // _render函数,即vm.$options.render 执行后得到vnode
       mark(endTag)
       measure(`vue ${name} render`, startTag, endTag)
 
       mark(startTag)
-      vm._update(vnode, hydrating)
+      vm._update(vnode, hydrating) // _update把虚拟DOM渲染成真正的DOM
       mark(endTag)
       measure(`vue ${name} patch`, startTag, endTag)
     }
@@ -316,7 +318,7 @@ export function deactivateChildComponent (vm: Component, direct?: boolean) {
 
 export function callHook (vm: Component, hook: string) {
   // #7573 disable dep collection when invoking lifecycle hooks
-  pushTarget()
+  pushTarget() // pushTarget 防止在生命周期钩子中使用 props 导致冗余的依赖收集
   const handlers = vm.$options[hook]
   if (handlers) {
     for (let i = 0, j = handlers.length; i < j; i++) {
@@ -327,6 +329,9 @@ export function callHook (vm: Component, hook: string) {
       }
     }
   }
+
+  // callHook结束后 通过vm.$emit发射名为 hook:${hook} 的事件
+  // 说明vue还可以这样玩: <child @hook:created="handleChildCreated" />
   if (vm._hasHookEvent) {
     vm.$emit('hook:' + hook)
   }

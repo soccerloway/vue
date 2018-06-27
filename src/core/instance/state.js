@@ -47,7 +47,7 @@ export function proxy (target: Object, sourceKey: string, key: string) {
 
 // 根据options里的配置初始化各states
 export function initState (vm: Component) {
-  vm._watchers = []
+  vm._watchers = [] // 存储该实例的所有watcher对象
   const opts = vm.$options
   if (opts.props) initProps(vm, opts.props)
   if (opts.methods) initMethods(vm, opts.methods)
@@ -57,6 +57,9 @@ export function initState (vm: Component) {
     observe(vm._data = {}, true /* asRootData */)
   }
   if (opts.computed) initComputed(vm, opts.computed)
+
+  // 这里判断是否存在watch 还判断了opts.watch是否等于nativeWatch
+  // 因为 在firefox中存在Object.prototype.watch方法 需要排除
   if (opts.watch && opts.watch !== nativeWatch) {
     initWatch(vm, opts.watch)
   }
@@ -146,9 +149,9 @@ function initData (vm: Component) {
         `Use prop default value instead.`,
         vm
       )
-    } else if (!isReserved(key)) {
+    } else if (!isReserved(key)) { // isReserved通过判断是否以$ _开头来确定是否是vue保留键
       /**
-       * 若data的key没有与methods/props冲突，且不是js保留字，则调用proxy代理key
+       * 若data的key没有与methods/props冲突，且不是vue保留字，则调用proxy代理key
        * 实际上data中key的值是存在_data[key]中的，proxy方法用于通过修改vm[key]
        * 的get方法，使我们能通过 vm[key] 获取到 vm._data[key] 中的值
        */
@@ -161,7 +164,7 @@ function initData (vm: Component) {
 
 export function getData (data: Function, vm: Component): any {
   // #7573 disable dep collection when invoking data getters
-  pushTarget()
+  pushTarget() // 防止使用 props 数据初始化 data 数据时收集冗余依赖
   try {
     return data.call(vm, vm)
   } catch (e) {

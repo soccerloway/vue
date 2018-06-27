@@ -19,6 +19,7 @@ export function initMixin (Vue: Class<Component>) {
     // a uid
     vm._uid = uid++
 
+    // 性能追踪的实现 标记组件的init开始标记
     let startTag, endTag
     /* istanbul ignore if */
     if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
@@ -28,6 +29,7 @@ export function initMixin (Vue: Class<Component>) {
     }
 
     // a flag to avoid this being observed
+    // 标记这个实例对象是一个vue实例
     vm._isVue = true
     // merge options
     if (options && options._isComponent) {
@@ -68,6 +70,7 @@ export function initMixin (Vue: Class<Component>) {
      */
 
     /* istanbul ignore if */
+    // 性能追踪的实现 标记组件的init结束标记 measure函数计算性能
     if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
       vm._name = formatComponentName(vm, false)
       mark(endTag)

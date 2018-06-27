@@ -34,6 +34,13 @@ let useMacroTask = false
 // in IE. The only polyfill that consistently queues the callback after all DOM
 // events triggered in the same loop is by using MessageChannel.
 /* istanbul ignore if */
+/**
+ * 三种方式将回调函数注册为(macro)task，也有优先级之分
+ * setImmediate 简洁且不做超时检测，但只兼容ie，性能最优
+ * MessageChannel也不做超时检测，次优
+ * setTimeout要做超时检测，兼容性好，保底选择
+ */
+// 这里只是在定义函数，执行后才会注册
 if (typeof setImmediate !== 'undefined' && isNative(setImmediate)) {
   macroTimerFunc = () => {
     setImmediate(flushCallbacks)
@@ -58,6 +65,8 @@ if (typeof setImmediate !== 'undefined' && isNative(setImmediate)) {
 
 // Determine microtask defer implementation.
 /* istanbul ignore next, $flow-disable-line */
+// 将回调函数注册为microtask 使用Promise，若不支持Promise，降级使用macrotask
+// 这里只是在定义函数，执行后才会注册
 if (typeof Promise !== 'undefined' && isNative(Promise)) {
   const p = Promise.resolve()
   microTimerFunc = () => {
@@ -67,7 +76,7 @@ if (typeof Promise !== 'undefined' && isNative(Promise)) {
     // microtask queue but the queue isn't being flushed, until the browser
     // needs to do some other work, e.g. handle a timer. Therefore we can
     // "force" the microtask queue to be flushed by adding an empty timer.
-    if (isIOS) setTimeout(noop)
+    if (isIOS) setTimeout(noop) // 兼容性 强制更新microtask队列
   }
 } else {
   // fallback to macro
@@ -87,6 +96,7 @@ export function withMacroTask (fn: Function): Function {
   })
 }
 
+// 完成回调函数到event loop task的注册
 export function nextTick (cb?: Function, ctx?: Object) {
   let _resolve
   callbacks.push(() => {

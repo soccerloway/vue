@@ -56,12 +56,17 @@ Vue.prototype.$mount = function (
     } else if (el) {
       template = getOuterHTML(el)
     }
+    /**
+     * 经过上面if...eles处理后，template的值为生成renderFn需要的模板字符串
+     */
+
     if (template) {
       /* istanbul ignore if */
       if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
         mark('compile')
       }
 
+      // compileToFunctions函数即是将 模板字符串 编译为render函数的关键函数
       const { render, staticRenderFns } = compileToFunctions(template, {
         shouldDecodeNewlines,
         shouldDecodeNewlinesForHref,

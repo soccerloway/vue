@@ -115,6 +115,8 @@ export function observe (value: any, asRootData: ?boolean): Observer | void {
   let ob: Observer | void
   // 参数value是vm._data对象
   if (hasOwn(value, '__ob__') && value.__ob__ instanceof Observer) {
+    // 当value上存在__ob__且__ob__是Observer实例 直接复制value.__ob__
+    // 这样可以避免对同一数据 进行重复观察 优化性能
     ob = value.__ob__
   } else if (
     shouldObserve &&
@@ -152,6 +154,8 @@ export function defineReactive (
   }
 
   // cater for pre-defined getter/setters
+  // 对象属性可能已经是存取描述符了，所以如果存在getter和setter就先保存起来
+  // 下面的defineProperty重新定义getter和setter时使用, 避免已有的get/set被覆盖
   const getter = property && property.get
   const setter = property && property.set
   if ((!getter || setter) && arguments.length === 2) {

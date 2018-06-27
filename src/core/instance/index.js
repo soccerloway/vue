@@ -1,3 +1,6 @@
+/**
+ * 此文件在运行时构建时执行完成，例如：npm run dev时执行完毕
+ */
 import { initMixin } from './init'
 import { stateMixin } from './state'
 import { renderMixin } from './render'
