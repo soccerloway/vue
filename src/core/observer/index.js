@@ -164,7 +164,7 @@ export function defineReactive (
 
   /**
    * observe -> Observer constructor -> defineReactive -> observe
-   * 这里递归调用observe对嵌套对象收集依赖
+   * 这里递归调用observe对嵌套对象进行getter/setter的注册
    */
   let childOb = !shallow && observe(val)
 
